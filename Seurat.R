@@ -10,7 +10,7 @@
 
 
 
-.libPaths(c("/cluster/home/user/R", .libPaths())) 
+#.libPaths(c("/cluster/home/petear/R", .libPaths())) #commented when running locally
 library("dplyr")
 library("Seurat")
 library("patchwork")
@@ -22,29 +22,57 @@ library("ggplot2")
 # features.tsv.gz
 # matrix.mtx.gz
 # pbmc_granulocyte_sorted_10k_per_barcode_metrics.csv
-pbmc.data <- Read10X(data.dir = "/cluster/projects/nn4605k/peter/from_junbai/to_peter_data/scRNAseq/NT8")
+
+#pbmc.data <- Read10X(data.dir = "/cluster/projects/nn4605k/peter/from_junbai/to_peter_data/scRNAseq/NT8")
+pbmc.data <- Read10X(data.dir = "/home/petear/sc_seq_data/to_peter_data/scRNAseq/NT8")
+
 
 #! Filtering cells and creating Seurat object
 # min.cells = 3: Only include genes that are expressed in at least 3 cells
 # min.features = 200: Only include cells that have at least 200 detected genes
-pbmc <- CreateSeuratObject(counts = pbmc.data, project = "JB_master", min.cells = 3, min.features = 200)
+pbmc <- CreateSeuratObject(counts = pbmc.data, project = "JBW_master", min.cells = 3, min.features = 200)
 
 
 # Create PDF of QC plots
-pdf("RNA_seq_QC.pdf")
+pdf("RNA_seq_QC2.pdf", width = 13, height = 10))
 
 #! QC here is metric on how much mitochondrial genes are found. A high number of mitochondrial genes may indicate cell damage where cytoplasmic RNA has leaked out of the cell
 # The [[ operator can add columns to object metadata. This is a great place to stash QC stats
 pbmc[["percent.mt"]] <- PercentageFeatureSet(pbmc, pattern = "^MT-")
 
 # Visualize QC metrics as a violin plot
-VlnPlot(pbmc, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+VlnPlot(pbmc, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3) + ggtitle("QC Violin Plots")
 
 # FeatureScatter is typically used to visualize feature-feature relationships, but can be used
 # for anything calculated by the object, i.e. columns in object metadata, PC scores etc.
-plot1 <- FeatureScatter(pbmc, feature1 = "nCount_RNA", feature2 = "percent.mt")
-plot2 <- FeatureScatter(pbmc, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
-plot1 + plot2
+plot1 <- FeatureScatter(pbmc, feature1 = "nCount_RNA", feature2 = "percent.mt") + ggtitle("nCount_RNA vs mitochondrial percentage")
+plot2 <- FeatureScatter(pbmc, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + ggtitle("nCount_RNA vs nFeature_RNA")
+plot1 + plot2 + plot_annotation("QC feature scatter plots")
+
+dist1 <- ggplot(pbmc@meta.data, aes(x = nFeature_RNA)) + 
+  geom_histogram(bins = 50, fill = "steelblue", alpha = 0.7) +
+  labs(title = "Distribution of Genes per Cell - UNFILTERED", 
+       subtitle = paste("Median:", median(pbmc$nFeature_RNA), "genes"),
+       x = "Number of Genes", y = "Number of Cells") +
+  theme_minimal()
+
+dist2 <- ggplot(pbmc@meta.data, aes(x = nCount_RNA)) + 
+  geom_histogram(bins = 50, fill = "forestgreen", alpha = 0.7) +
+  labs(title = "Distribution of UMIs per Cell - UNFILTERED",
+       subtitle = paste("Median:", median(pbmc$nCount_RNA), "UMIs"),
+       x = "Number of UMIs", y = "Number of Cells") +
+  theme_minimal()
+
+dist3 <- ggplot(pbmc@meta.data, aes(x = percent.mt)) + 
+  geom_histogram(bins = 50, fill = "coral", alpha = 0.7) +
+  labs(title = "Distribution of Mitochondrial % - UNFILTERED",
+       subtitle = paste("Median:", round(median(pbmc$percent.mt), 2), "%"),
+       x = "Mitochondrial %", y = "Number of Cells") +
+  theme_minimal()
+
+print(dist1)
+print(dist2)
+print(dist3)
 
 #! Normalizing the data 
 # Scale factor of 10,000: counts per 10,000
@@ -67,9 +95,9 @@ top10 <- head(VariableFeatures(pbmc), 10)
 
 # plot variable features with and without labels
 # Highly variable genes (likely to be biologically relevant) are highlighted.
-plot1 <- VariableFeaturePlot(pbmc)
-plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
-plot1 + plot2
+plot1 <- VariableFeaturePlot(pbmc) + ggtitle("Variable Feature Plot")
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE) + ggtitle("Top 10 Variable Genes")
+plot1 + plot2 + plot_annotation("Variable Feature Plots")
 
 #! Scaling the data
 all.genes <- rownames(pbmc) # Get all gene names as they are rows in the pbmc
@@ -84,14 +112,19 @@ pbmc <- FindVariableFeatures(pbmc)
 
 print(pbmc[["pca"]], dims = 1:5, nfeatures = 5)
 
-VizDimLoadings(pbmc, dims = 1:2, reduction = "pca") # Visualize the top genes contributing to PC1 and PC2
+VizDimLoadings(pbmc, dims = 1:2, reduction = "pca") + ggtitle("PCA Loadings dim 1 + 2")
 
-DimPlot(pbmc, reduction = "pca") + NoLegend()   
-DimHeatmap(pbmc, dims = 1, cells = 500, balanced = TRUE)
-DimHeatmap(pbmc, dims = 1:15, cells = 500, balanced = TRUE)
+# For dims = 1
+DimPlot(pbmc, reduction = "pca") + NoLegend() + ggtitle("PCA DimPlot")  
+heatmap1 <- DimHeatmap(pbmc, dims = 1, cells = 500, balanced = TRUE, fast = FALSE)
+heatmap1 + plot_annotation(title = "PCA DimHeatmap PC 1")
+
+# For multiple dimensions
+heatmap2 <- DimHeatmap(pbmc, dims = 1:15, cells = 500, balanced = TRUE, fast = FALSE) 
+heatmap2 + plot_annotation(title = "PCA DimHeatmap PCs 1-15")
 
 #! Determining the 'dimensionality' of the data
-ElbowPlot(pbmc)
+ElbowPlot(pbmc) + ggtitle("PCA Elbow Plot")
 
 #! Cluster the cells 
 # Here we use the first 10 PCs, as suggested by the elbow plot
@@ -105,11 +138,11 @@ head(Idents(pbmc), 5)
 
 #! Non-linear dimensional reduction (UMAP/tSNE) 
 
-pbmc <- RunUMAP(pbmc, dims = 1:10)
+pbmc <- RunUMAP(pbmc, dims = 1:10) 
 
 # note that you can set `label = TRUE` or use the LabelClusters function to help label
 # individual clusters
-DimPlot(pbmc, reduction = "umap")
+DimPlot(pbmc, reduction = "umap") + ggtitle("UMAP cluster label")
 
 #! Finding differentially expressed features (cluster biomarkers)
 # find all markers of cluster 2
@@ -133,21 +166,20 @@ pbmc.markers %>%
 # find markers for cluster 0 with a logfc threshold of 0.25 using the ROC test and use cluster 0 of interest
 cluster0.markers <- FindMarkers(pbmc, ident.1 = 0, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
 
-VlnPlot(pbmc, features = c("MS4A1", "CD79A"))
+VlnPlot(pbmc, features = c("MS4A1", "CD79A")) + ggtitle("Cell marker for B cells and MS4A1/CD79A") 
 
 # you can plot raw counts as well
-VlnPlot(pbmc, features = c("NKG7", "PF4"), slot = "counts", log = TRUE)
+VlnPlot(pbmc, features = c("NKG7", "PF4"), slot = "counts", log = TRUE) + ggtitle("Cluster NKG7 and PF4 raw counts")
 
-
-FeaturePlot(pbmc, features = c("MS4A1", "GNLY", "CD3E", "CD14", "FCER1A", "FCGR3A", "LYZ", "PPBP",
-    "CD8A"))
+# scatter plot of features with genes
+FeaturePlot(pbmc, features = c("MS4A1", "GNLY", "CD3E", "CD14", "FCER1A", "FCGR3A", "LYZ", "PPBP", "CD8A")) + ggtitle("Marker Genes Feature Plot")
 
 pbmc.markers %>%
     group_by(cluster) %>%
     dplyr::filter(avg_log2FC > 1) %>%
     slice_head(n = 10) %>%
     ungroup() -> top10
-DoHeatmap(pbmc, features = top10$gene) + NoLegend()
+DoHeatmap(pbmc, features = top10$gene) + NoLegend() + ggtitle("Top 10 Marker Genes Heatmap")
 
 #! Assigning cell type identity to clusters 
 #Canonical markers available? 
