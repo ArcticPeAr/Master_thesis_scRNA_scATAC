@@ -1,5 +1,5 @@
 # Load necessary libraries
-.libPaths(c("/cluster/home/petear/R", .libPaths()))
+#.libPaths(c("/cluster/home/petear/R", .libPaths())) #commented when running locally
 library("dplyr")
 library("Seurat")
 library("patchwork")
@@ -10,7 +10,8 @@ dir.create("unfiltered_analysis", showWarnings = FALSE)
 dir.create("unfiltered_figures", showWarnings = FALSE)
 
 # Load data
-pbmc.data <- Read10X(data.dir = "/cluster/projects/nn4605k/peter/from_junbai/to_peter_data/scRNAseq/NT8")
+#pbmc.data <- Read10X(data.dir = "/cluster/projects/nn4605k/peter/from_junbai/to_peter_data/scRNAseq/NT8")
+pbmc.data <- Read10X(data.dir = "/home/petear/sc_seq_data/to_peter_data/scRNAseq/NT8")
 
 # Create UNFILTERED Seurat object
 pbmc.unfiltered <- CreateSeuratObject(counts = pbmc.data, project = "JBW_master_unfiltered",
