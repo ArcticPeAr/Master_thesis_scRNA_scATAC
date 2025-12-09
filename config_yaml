@@ -1,0 +1,9 @@
+# config.yaml
+samples:
+  - NT7
+  - NT8
+
+sample_dirs:
+  NT7: "/home/petear/sc_seq_data/to_peter_data/scRNAseq/NT7"
+  NT8: "/home/petear/sc_seq_data/to_peter_data/scRNAseq/NT8"
+  
